@@ -1,0 +1,208 @@
+package com.mycompany.meta_1._crud;
+
+import javafx.collections.FXCollections;
+import javafx.collections.ObservableList;
+import javafx.fxml.FXML;
+import javafx.scene.control.*;
+import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.collections.transformation.FilteredList;
+import javafx.collections.transformation.SortedList;
+import javafx.scene.layout.GridPane;
+import javafx.geometry.Insets;
+import java.util.Optional;
+import java.util.Arrays;
+import java.util.List;
+
+public class PersonaControllerGUI {
+    @FXML private TextField txtNombre;
+    @FXML private TextField txtDireccion;
+    @FXML private TextField txtBuscar;
+    @FXML private TextArea txtTelefonos; 
+    
+    @FXML private TableView<Persona> tablaPersonas;
+    @FXML private TableColumn<Persona, Integer> colId;
+    @FXML private TableColumn<Persona, String> colNombre;
+    @FXML private TableColumn<Persona, String> colDireccion;
+
+    // --- VARIABLES DE LÓGICA ---
+    private PersonaDB personaDB = new PersonaDB();
+    // Inicializamos la lista aquí para que el buscador funcione correctamente
+    private ObservableList<Persona> listaPersonas = FXCollections.observableArrayList();
+    private Persona personaSeleccionada = null; 
+
+    @FXML
+    public void initialize() {
+        colId.setCellValueFactory(new PropertyValueFactory<>("id"));
+        colNombre.setCellValueFactory(new PropertyValueFactory<>("nombre"));
+        colDireccion.setCellValueFactory(new PropertyValueFactory<>("direccion"));
+
+        // 2. Cargar los datos iniciales
+        cargarTabla();
+
+        // 3. --- LÓGICA DEL BUSCADOR ---
+        FilteredList<Persona> datosFiltrados = new FilteredList<>(listaPersonas, p -> true);
+        
+        txtBuscar.textProperty().addListener((observable, oldValue, newValue) -> {
+            datosFiltrados.setPredicate(persona -> {
+                if (newValue == null || newValue.isEmpty()) return true;
+                
+                String textoBuscado = newValue.toLowerCase();
+                if (persona.getNombre().toLowerCase().contains(textoBuscado)) return true;
+                else if (persona.getDireccion().toLowerCase().contains(textoBuscado)) return true;
+                
+                return false;
+            });
+        });
+
+        SortedList<Persona> datosOrdenados = new SortedList<>(datosFiltrados);
+        datosOrdenados.comparatorProperty().bind(tablaPersonas.comparatorProperty());
+        tablaPersonas.setItems(datosOrdenados);
+
+        // 4. Escuchar clics en la tabla
+        tablaPersonas.getSelectionModel().selectedItemProperty().addListener(
+            (observable, oldValue, newValue) -> seleccionarPersona(newValue)
+        );
+    }
+
+    private void cargarTabla() {
+        // Usamos setAll para no perder la conexión con el buscador
+        listaPersonas.setAll(personaDB.listar());
+    }
+
+    @FXML
+    private void guardarPersona() {
+        String nombre = txtNombre.getText();
+        String direccion = txtDireccion.getText();
+        List<String> telefonos = Arrays.asList(txtTelefonos.getText().split(","))
+                                       .stream().map(String::trim).toList();
+
+        if (nombre.isEmpty()) {
+            mostrarAlerta("Error", "El nombre no puede estar vacío.");
+            return;
+        }
+
+        // CREAR NUEVA PERSONA 
+        Persona nueva = new Persona(0, nombre, direccion);
+        nueva.setTelefonos(telefonos);
+        
+        if (personaDB.insertar(nueva)) {
+            mostrarAlerta("Éxito", "Persona guardada correctamente.");
+            limpiarFormulario();
+            cargarTabla();
+        }
+    }
+
+    @FXML
+    private void modificarPersona() {
+        if (personaSeleccionada == null) {
+            mostrarAlerta("Atención", "Primero selecciona una persona de la tabla para editar.");
+            return;
+        }
+
+        // 1. Crear una ventana emergente (Dialog)
+        Dialog<ButtonType> dialog = new Dialog<>();
+        dialog.setTitle("Editar Persona");
+        dialog.setHeaderText("Modificando los datos de: " + personaSeleccionada.getNombre());
+
+        // 2. Ponerle botones de Guardar y Cancelar
+        ButtonType btnGuardar = new ButtonType("Guardar Cambios", ButtonBar.ButtonData.OK_DONE);
+        dialog.getDialogPane().getButtonTypes().addAll(btnGuardar, ButtonType.CANCEL);
+
+        // 3. Crear el diseño de la ventana (un Grid)
+        GridPane grid = new GridPane();
+        grid.setHgap(10);
+        grid.setVgap(10);
+        grid.setPadding(new Insets(20, 50, 10, 10));
+
+        // 4. Crear los cuadros de texto ya con los datos de la persona cargados
+        TextField editNombre = new TextField(personaSeleccionada.getNombre());
+        TextField editDireccion = new TextField(personaSeleccionada.getDireccion());
+        TextArea editTelefonos = new TextArea(String.join(", ", personaSeleccionada.getTelefonos()));
+        editTelefonos.setPrefRowCount(3); // Para que no sea tan alto
+
+        grid.add(new Label("Nombre:"), 0, 0);
+        grid.add(editNombre, 1, 0);
+        grid.add(new Label("Dirección:"), 0, 1);
+        grid.add(editDireccion, 1, 1);
+        grid.add(new Label("Teléfonos:"), 0, 2);
+        grid.add(editTelefonos, 1, 2);
+
+        dialog.getDialogPane().setContent(grid);
+
+        // 5. Mostrar la ventana y esperar a que el usuario presione un botón
+        Optional<ButtonType> resultado = dialog.showAndWait();
+        
+        // 6. Si el usuario le dio a "Guardar Cambios"
+        if (resultado.isPresent() && resultado.get() == btnGuardar) {
+            if (editNombre.getText().isEmpty()) {
+                mostrarAlerta("Error", "El nombre no puede estar vacío.");
+                return;
+            }
+
+            // Actualizamos el objeto con lo que escribió en la ventanita
+            personaSeleccionada.setNombre(editNombre.getText());
+            personaSeleccionada.setDireccion(editDireccion.getText());
+            List<String> nuevosTelefonos = Arrays.asList(editTelefonos.getText().split(","))
+                                           .stream().map(String::trim).toList();
+            personaSeleccionada.setTelefonos(nuevosTelefonos);
+
+            // Lo mandamos a la base de datos
+            if (personaDB.actualizar(personaSeleccionada)) {
+                mostrarAlerta("Éxito", "Persona actualizada correctamente.");
+                cargarTabla(); // Refrescar la tabla para ver los cambios
+                tablaPersonas.getSelectionModel().clearSelection(); // Deseleccionar
+                personaSeleccionada = null;
+            }
+        }
+    }
+
+    @FXML
+    private void verDetalles() {
+        if (personaSeleccionada != null) {
+            String detalles = "ID: " + personaSeleccionada.getId() + "\n"
+                            + "Nombre: " + personaSeleccionada.getNombre() + "\n"
+                            + "Dirección: " + personaSeleccionada.getDireccion() + "\n"
+                            + "Teléfonos:\n - " + String.join("\n - ", personaSeleccionada.getTelefonos());
+            
+            mostrarAlerta("Detalles de " + personaSeleccionada.getNombre(), detalles);
+        } else {
+            mostrarAlerta("Atención", "Selecciona una persona de la tabla para ver sus detalles.");
+        }
+    }
+
+    @FXML
+    private void eliminarPersona() {
+        if (personaSeleccionada != null) {
+            if (personaDB.eliminar(personaSeleccionada.getId())) {
+                mostrarAlerta("Éxito", "Persona eliminada correctamente.");
+                limpiarFormulario();
+                cargarTabla();
+            }
+        } else {
+            mostrarAlerta("Atención", "Selecciona una persona de la tabla para eliminarla.");
+        }
+    }
+
+    @FXML
+    private void limpiarFormulario() {
+        txtNombre.clear();
+        txtDireccion.clear();
+        txtTelefonos.clear();
+        personaSeleccionada = null; 
+        tablaPersonas.getSelectionModel().clearSelection();
+    }
+
+    private void seleccionarPersona(Persona p) {
+        if (p != null) {
+            personaSeleccionada = p;
+        }
+    }
+
+    private void mostrarAlerta(String titulo, String mensaje) {
+        Alert alert = new Alert(Alert.AlertType.INFORMATION);
+        alert.setTitle(titulo);
+        alert.setHeaderText(null);
+        alert.setContentText(mensaje);
+        alert.showAndWait();
+    }
+}

@@ -1,0 +1,79 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<?import javafx.geometry.Insets?>
+<?import javafx.scene.control.Button?>
+<?import javafx.scene.control.Label?>
+<?import javafx.scene.control.TableColumn?>
+<?import javafx.scene.control.TableView?>
+<?import javafx.scene.control.TextArea?>
+<?import javafx.scene.control.TextField?>
+<?import javafx.scene.layout.HBox?>
+<?import javafx.scene.layout.VBox?>
+
+<VBox prefHeight="550.0" prefWidth="850.0" spacing="15.0" xmlns="http://javafx.com/javafx/23" xmlns:fx="http://javafx.com/fxml/1" fx:controller="com.mycompany.meta_1._crud.PersonaControllerGUI">
+   <padding>
+      <Insets bottom="20.0" left="20.0" right="20.0" top="20.0" />
+   </padding>
+   <children>
+      <Label style="-fx-font-size: 24px; -fx-font-weight: bold;" text="Agenda - Gestión de Personas" />
+      
+      <HBox prefHeight="400.0" prefWidth="600.0" spacing="20.0" VBox.vgrow="ALWAYS">
+         <children>
+            <VBox prefWidth="280.0" spacing="10.0">
+               <children>
+                  <Label text="Nombre:" />
+                  <TextField fx:id="txtNombre" promptText="Ej. Juan Pérez" />
+                  
+                  <Label text="Dirección:" />
+                  <TextField fx:id="txtDireccion" promptText="Ej. Calle Falsa 123" />
+                  
+                  <Label text="Teléfonos (separados por coma):" />
+                  <TextArea fx:id="txtTelefonos" prefHeight="80.0" promptText="Ej. 555-1234, 666-9876" />
+                  
+                  <HBox spacing="10.0">
+                     <children>
+                        <Button mnemonicParsing="false" onAction="#guardarPersona" style="-fx-background-color: #4CAF50; -fx-text-fill: white; -fx-font-weight: bold;" text="Agregar" />
+                        <Button mnemonicParsing="false" onAction="#modificarPersona" style="-fx-background-color: #2196F3; -fx-text-fill: white; -fx-font-weight: bold;" text="Editar" />
+                        <Button mnemonicParsing="false" onAction="#limpiarFormulario" text="Limpiar" />
+                     </children>
+                     <VBox.margin>
+                        <Insets top="10.0" />
+                     </VBox.margin>
+                  </HBox>
+                  
+                  <HBox spacing="10.0">
+                     <VBox.margin>
+                        <Insets top="15.0" />
+                     </VBox.margin>
+                     <children>
+                         <Button mnemonicParsing="false" onAction="#eliminarPersona" style="-fx-background-color: #f44336; -fx-text-fill: white; -fx-font-weight: bold;" text="Eliminar" />
+                         <Button mnemonicParsing="false" onAction="#verDetalles" style="-fx-background-color: #FF9800; -fx-text-fill: white; -fx-font-weight: bold;" text="Ver Detalles" />
+                     </children>
+                  </HBox>
+               </children>
+            </VBox>
+            
+            <VBox spacing="10.0" HBox.hgrow="ALWAYS">
+               <children>
+                  <HBox alignment="CENTER_LEFT" spacing="10.0">
+                     <children>
+                        <Label text="Buscar:" />
+                        <TextField fx:id="txtBuscar" promptText="Buscar por nombre..." HBox.hgrow="ALWAYS" />
+                     </children>
+                  </HBox>
+                  <TableView fx:id="tablaPersonas" prefHeight="200.0" prefWidth="200.0" VBox.vgrow="ALWAYS">
+                    <columns>
+                      <TableColumn fx:id="colId" prefWidth="50.0" text="ID" />
+                      <TableColumn fx:id="colNombre" prefWidth="150.0" text="Nombre" />
+                        <TableColumn fx:id="colDireccion" prefWidth="200.0" text="Dirección" />
+                    </columns>
+                     <columnResizePolicy>
+                        <TableView fx:constant="CONSTRAINED_RESIZE_POLICY" />
+                     </columnResizePolicy>
+                  </TableView>
+               </children>
+            </VBox>
+         </children>
+      </HBox>
+   </children>
+</VBox>
