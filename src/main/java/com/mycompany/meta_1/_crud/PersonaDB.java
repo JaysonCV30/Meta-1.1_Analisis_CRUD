@@ -4,7 +4,7 @@ import java.sql.*;
 import java.util.ArrayList;
 import java.util.List;
 
-public class PersonaDB {
+public class PersonaDB implements IPersonaRepository {
 
     // 1. LISTAR TODAS LAS PERSONAS
     public List<Persona> listar() {

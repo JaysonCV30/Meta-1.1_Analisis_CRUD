@@ -56,28 +56,4 @@ public class Persona {
     public void setDirecciones(List<Direccion> direcciones) {
         this.direcciones = direcciones;
     }
-
-    public String getDireccion() {
-        if (direcciones == null || direcciones.isEmpty()) {
-            return "";
-        }
-        List<String> textosDirecciones = new ArrayList<>();
-        for (Direccion d : direcciones) {
-            textosDirecciones.add(d.getDireccionCompleta());
-        }
-        return String.join(" ; ", textosDirecciones);
-    }
-    
-    public void setDireccion(String direccionTexto) {
-        this.direcciones.clear(); // Limpiamos las anteriores
-        if (direccionTexto != null && !direccionTexto.trim().isEmpty()) {
-            // Si el usuario escribe varias separadas por punto y coma, las dividimos
-            String[] separadas = direccionTexto.split(";");
-            for (String dir : separadas) {
-                Direccion nuevaDir = new Direccion();
-                nuevaDir.setDireccionCompleta(dir.trim());
-                this.direcciones.add(nuevaDir);
-            }
-        }
-    }
 }

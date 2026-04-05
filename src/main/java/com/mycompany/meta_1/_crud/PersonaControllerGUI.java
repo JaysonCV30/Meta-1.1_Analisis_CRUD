@@ -5,6 +5,7 @@ import javafx.collections.ObservableList;
 import javafx.fxml.FXML;
 import javafx.scene.control.*;
 import javafx.scene.control.cell.PropertyValueFactory;
+import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.transformation.FilteredList;
 import javafx.collections.transformation.SortedList;
 import javafx.scene.layout.GridPane;
@@ -26,7 +27,7 @@ public class PersonaControllerGUI {
     @FXML private TableColumn<Persona, String> colDireccion;
 
     // --- VARIABLES DE LÓGICA ---
-    private PersonaDB personaDB = new PersonaDB();
+    private IPersonaRepository personaDB = new PersonaDB();
     private ObservableList<Persona> listaPersonas = FXCollections.observableArrayList();
     private Persona personaSeleccionada = null; 
 
@@ -34,7 +35,14 @@ public class PersonaControllerGUI {
     public void initialize() {
         colId.setCellValueFactory(new PropertyValueFactory<>("id"));
         colNombre.setCellValueFactory(new PropertyValueFactory<>("nombre"));
-        colDireccion.setCellValueFactory(new PropertyValueFactory<>("direccion"));
+        // La interfaz gráfica se encarga de cómo se muestran los datos en la tabla
+        colDireccion.setCellValueFactory(cellData -> {
+            List<Direccion> dirs = cellData.getValue().getDirecciones();
+            String dirStr = dirs.stream()
+                                .map(Direccion::getDireccionCompleta)
+                                .collect(Collectors.joining(" ; "));
+            return new SimpleStringProperty(dirStr);
+        });
 
         // Cargar los datos iniciales
         cargarTabla();
@@ -48,7 +56,10 @@ public class PersonaControllerGUI {
                 
                 String textoBuscado = newValue.toLowerCase();
                 if (persona.getNombre().toLowerCase().contains(textoBuscado)) return true;
-                else if (persona.getDireccion().toLowerCase().contains(textoBuscado)) return true;
+                // Buscamos dentro de la lista de objetos Direccion
+                boolean coincidenciaDir = persona.getDirecciones().stream()
+                    .anyMatch(d -> d.getDireccionCompleta().toLowerCase().contains(textoBuscado));
+                if (coincidenciaDir) return true;
                 
                 return false;
             });
@@ -71,7 +82,7 @@ public class PersonaControllerGUI {
     @FXML
     private void guardarPersona() {
         String nombre = txtNombre.getText();
-        String direccion = txtDireccion.getText();
+        String direccionTxt = txtDireccion.getText();
         List<String> telefonos = Arrays.asList(txtTelefonos.getText().split(","))
                                        .stream()
                                        .map(String::trim)
@@ -83,11 +94,19 @@ public class PersonaControllerGUI {
             return;
         }
 
-        // CREAR NUEVA PERSONA (Usando el constructor actualizado)
         Persona nueva = new Persona(0, nombre);
-        // Usamos el método que creamos para que separe el texto por punto y coma ";"
-        nueva.setDireccion(direccion); 
         nueva.setTelefonos(telefonos);
+        // --- SRP: El controlador transforma el texto escrito en objetos ---
+        List<Direccion> listaDirs = Arrays.stream(direccionTxt.split(";"))
+                                          .map(String::trim)
+                                          .filter(d -> !d.isEmpty())
+                                          .map(d -> {
+                                              Direccion dir = new Direccion();
+                                              dir.setDireccionCompleta(d);
+                                              return dir;
+                                          })
+                                          .collect(Collectors.toList());
+        nueva.setDirecciones(listaDirs);
         
         if (personaDB.insertar(nueva)) {
             mostrarAlerta("Éxito", "Persona guardada correctamente.");
@@ -116,7 +135,11 @@ public class PersonaControllerGUI {
         grid.setPadding(new Insets(20, 50, 10, 10));
 
         TextField editNombre = new TextField(personaSeleccionada.getNombre());
-        TextField editDireccion = new TextField(personaSeleccionada.getDireccion());
+        // Preparar el texto de direcciones para que se vea bien al editar
+        String dirsActuales = personaSeleccionada.getDirecciones().stream()
+                                .map(Direccion::getDireccionCompleta)
+                                .collect(Collectors.joining("; "));
+        TextField editDireccion = new TextField(dirsActuales);
         TextArea editTelefonos = new TextArea(String.join(", ", personaSeleccionada.getTelefonos()));
         editTelefonos.setPrefRowCount(3);
 
@@ -132,20 +155,23 @@ public class PersonaControllerGUI {
         Optional<ButtonType> resultado = dialog.showAndWait();
         
         if (resultado.isPresent() && resultado.get() == btnGuardar) {
-            if (editNombre.getText().isEmpty()) {
-                mostrarAlerta("Error", "El nombre no puede estar vacío.");
-                return;
-            }
+            if (editNombre.getText().isEmpty()) return;
 
             personaSeleccionada.setNombre(editNombre.getText());
-            personaSeleccionada.setDireccion(editDireccion.getText()); // Separa automáticamente
             
             List<String> nuevosTelefonos = Arrays.asList(editTelefonos.getText().split(","))
-                                                 .stream()
-                                                 .map(String::trim)
-                                                 .filter(t -> !t.isEmpty())
-                                                 .collect(Collectors.toList());
+                                                 .stream().map(String::trim).filter(t -> !t.isEmpty()).collect(Collectors.toList());
             personaSeleccionada.setTelefonos(nuevosTelefonos);
+            
+            List<Direccion> nuevasDirs = Arrays.stream(editDireccion.getText().split(";"))
+                                               .map(String::trim).filter(d -> !d.isEmpty())
+                                               .map(d -> {
+                                                   Direccion dir = new Direccion();
+                                                   dir.setDireccionCompleta(d);
+                                                   return dir;
+                                               })
+                                               .collect(Collectors.toList());
+            personaSeleccionada.setDirecciones(nuevasDirs);
 
             if (personaDB.actualizar(personaSeleccionada)) {
                 mostrarAlerta("Éxito", "Persona actualizada correctamente.");
