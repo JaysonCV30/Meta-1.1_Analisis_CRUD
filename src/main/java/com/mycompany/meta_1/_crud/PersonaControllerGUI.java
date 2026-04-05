@@ -12,6 +12,7 @@ import javafx.geometry.Insets;
 import java.util.Optional;
 import java.util.Arrays;
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class PersonaControllerGUI {
     @FXML private TextField txtNombre;
@@ -26,7 +27,6 @@ public class PersonaControllerGUI {
 
     // --- VARIABLES DE LÓGICA ---
     private PersonaDB personaDB = new PersonaDB();
-    // Inicializamos la lista aquí para que el buscador funcione correctamente
     private ObservableList<Persona> listaPersonas = FXCollections.observableArrayList();
     private Persona personaSeleccionada = null; 
 
@@ -36,10 +36,10 @@ public class PersonaControllerGUI {
         colNombre.setCellValueFactory(new PropertyValueFactory<>("nombre"));
         colDireccion.setCellValueFactory(new PropertyValueFactory<>("direccion"));
 
-        // 2. Cargar los datos iniciales
+        // Cargar los datos iniciales
         cargarTabla();
 
-        // 3. --- LÓGICA DEL BUSCADOR ---
+        // --- LÓGICA DEL BUSCADOR ---
         FilteredList<Persona> datosFiltrados = new FilteredList<>(listaPersonas, p -> true);
         
         txtBuscar.textProperty().addListener((observable, oldValue, newValue) -> {
@@ -58,14 +58,13 @@ public class PersonaControllerGUI {
         datosOrdenados.comparatorProperty().bind(tablaPersonas.comparatorProperty());
         tablaPersonas.setItems(datosOrdenados);
 
-        // 4. Escuchar clics en la tabla
+        // Escuchar clics en la tabla
         tablaPersonas.getSelectionModel().selectedItemProperty().addListener(
             (observable, oldValue, newValue) -> seleccionarPersona(newValue)
         );
     }
 
     private void cargarTabla() {
-        // Usamos setAll para no perder la conexión con el buscador
         listaPersonas.setAll(personaDB.listar());
     }
 
@@ -74,15 +73,20 @@ public class PersonaControllerGUI {
         String nombre = txtNombre.getText();
         String direccion = txtDireccion.getText();
         List<String> telefonos = Arrays.asList(txtTelefonos.getText().split(","))
-                                       .stream().map(String::trim).toList();
+                                       .stream()
+                                       .map(String::trim)
+                                       .filter(t -> !t.isEmpty()) // Evitar teléfonos vacíos
+                                       .collect(Collectors.toList());
 
         if (nombre.isEmpty()) {
             mostrarAlerta("Error", "El nombre no puede estar vacío.");
             return;
         }
 
-        // CREAR NUEVA PERSONA 
-        Persona nueva = new Persona(0, nombre, direccion);
+        // CREAR NUEVA PERSONA (Usando el constructor actualizado)
+        Persona nueva = new Persona(0, nombre);
+        // Usamos el método que creamos para que separe el texto por punto y coma ";"
+        nueva.setDireccion(direccion); 
         nueva.setTelefonos(telefonos);
         
         if (personaDB.insertar(nueva)) {
@@ -99,58 +103,54 @@ public class PersonaControllerGUI {
             return;
         }
 
-        // 1. Crear una ventana emergente (Dialog)
         Dialog<ButtonType> dialog = new Dialog<>();
         dialog.setTitle("Editar Persona");
-        dialog.setHeaderText("Modificando los datos de: " + personaSeleccionada.getNombre());
+        dialog.setHeaderText("Modificando a: " + personaSeleccionada.getNombre() + "\n(Separa múltiples direcciones con punto y coma ';')");
 
-        // 2. Ponerle botones de Guardar y Cancelar
         ButtonType btnGuardar = new ButtonType("Guardar Cambios", ButtonBar.ButtonData.OK_DONE);
         dialog.getDialogPane().getButtonTypes().addAll(btnGuardar, ButtonType.CANCEL);
 
-        // 3. Crear el diseño de la ventana (un Grid)
         GridPane grid = new GridPane();
         grid.setHgap(10);
         grid.setVgap(10);
         grid.setPadding(new Insets(20, 50, 10, 10));
 
-        // 4. Crear los cuadros de texto ya con los datos de la persona cargados
         TextField editNombre = new TextField(personaSeleccionada.getNombre());
         TextField editDireccion = new TextField(personaSeleccionada.getDireccion());
         TextArea editTelefonos = new TextArea(String.join(", ", personaSeleccionada.getTelefonos()));
-        editTelefonos.setPrefRowCount(3); // Para que no sea tan alto
+        editTelefonos.setPrefRowCount(3);
 
         grid.add(new Label("Nombre:"), 0, 0);
         grid.add(editNombre, 1, 0);
-        grid.add(new Label("Dirección:"), 0, 1);
+        grid.add(new Label("Direcciones (;):"), 0, 1);
         grid.add(editDireccion, 1, 1);
-        grid.add(new Label("Teléfonos:"), 0, 2);
+        grid.add(new Label("Teléfonos (,):"), 0, 2);
         grid.add(editTelefonos, 1, 2);
 
         dialog.getDialogPane().setContent(grid);
 
-        // 5. Mostrar la ventana y esperar a que el usuario presione un botón
         Optional<ButtonType> resultado = dialog.showAndWait();
         
-        // 6. Si el usuario le dio a "Guardar Cambios"
         if (resultado.isPresent() && resultado.get() == btnGuardar) {
             if (editNombre.getText().isEmpty()) {
                 mostrarAlerta("Error", "El nombre no puede estar vacío.");
                 return;
             }
 
-            // Actualizamos el objeto con lo que escribió en la ventanita
             personaSeleccionada.setNombre(editNombre.getText());
-            personaSeleccionada.setDireccion(editDireccion.getText());
+            personaSeleccionada.setDireccion(editDireccion.getText()); // Separa automáticamente
+            
             List<String> nuevosTelefonos = Arrays.asList(editTelefonos.getText().split(","))
-                                           .stream().map(String::trim).toList();
+                                                 .stream()
+                                                 .map(String::trim)
+                                                 .filter(t -> !t.isEmpty())
+                                                 .collect(Collectors.toList());
             personaSeleccionada.setTelefonos(nuevosTelefonos);
 
-            // Lo mandamos a la base de datos
             if (personaDB.actualizar(personaSeleccionada)) {
                 mostrarAlerta("Éxito", "Persona actualizada correctamente.");
-                cargarTabla(); // Refrescar la tabla para ver los cambios
-                tablaPersonas.getSelectionModel().clearSelection(); // Deseleccionar
+                cargarTabla(); 
+                tablaPersonas.getSelectionModel().clearSelection(); 
                 personaSeleccionada = null;
             }
         }
@@ -159,10 +159,18 @@ public class PersonaControllerGUI {
     @FXML
     private void verDetalles() {
         if (personaSeleccionada != null) {
+            // Extraer las direcciones de la lista de objetos para mostrarlas bonito
+            List<String> listaDirecciones = personaSeleccionada.getDirecciones().stream()
+                                            .map(Direccion::getDireccionCompleta)
+                                            .collect(Collectors.toList());
+
+            String strDirecciones = listaDirecciones.isEmpty() ? "Ninguna" : String.join("\n - ", listaDirecciones);
+            String strTelefonos = personaSeleccionada.getTelefonos().isEmpty() ? "Ninguno" : String.join("\n - ", personaSeleccionada.getTelefonos());
+
             String detalles = "ID: " + personaSeleccionada.getId() + "\n"
-                            + "Nombre: " + personaSeleccionada.getNombre() + "\n"
-                            + "Dirección: " + personaSeleccionada.getDireccion() + "\n"
-                            + "Teléfonos:\n - " + String.join("\n - ", personaSeleccionada.getTelefonos());
+                            + "Nombre: " + personaSeleccionada.getNombre() + "\n\n"
+                            + "Direcciones:\n - " + strDirecciones + "\n\n"
+                            + "Teléfonos:\n - " + strTelefonos;
             
             mostrarAlerta("Detalles de " + personaSeleccionada.getNombre(), detalles);
         } else {
